@@ -197,7 +197,7 @@ const sendWhatsAppNotification = async (to: string, templateName: string, params
   };
 
   try {
-    console.log(`Sending WhatsApp template ${templateName} to ${finalTo}...`);
+    console.log(`Sending WhatsApp template ${templateName} to ${finalTo} with params:`, JSON.stringify(params));
     const response = await axios.post(url, data, {
       headers: {
         "Content-Type": "application/json",
@@ -241,7 +241,8 @@ const sendStockpileCreatedNotification = async (vendor: any, stockpile: any) => 
 
     const itemsSummary = stockpile.items.map((item: any) => `${item.name}(x${item.quantity})`).join(", ");
     const closingDate = format(new Date(stockpile.endDate), "d MMM yyyy");
-    const publicUrl = `${process.env.APP_URL || ""}/view/${stockpile._id}`;
+    const baseUrl = (process.env.APP_URL || "https://www.usecartlist.com").replace(/\/$/, "");
+    const publicUrl = `${baseUrl}/view/${stockpile._id}`;
 
     // Template: stockpile_created
     // Params: {{1}}Customer, {{2}}Vendor, {{3}}Items, {{4}}Total, {{5}}Link
@@ -302,7 +303,8 @@ const sendStockpileUpdateNotification = async (vendor: any, stockpile: any, item
     const prefs = vendor.notifications?.stockpileUpdates || { email: true, sms: true, push: true, inApp: true };
     const itemsSummary = itemsAdded.map((item: any) => `${item.name}(x${item.quantity})`).join(", ");
     const closingDate = format(new Date(stockpile.endDate), "d MMM yyyy");
-    const publicUrl = `${process.env.APP_URL || ""}/view/${stockpile._id}`;
+    const baseUrl = (process.env.APP_URL || "https://www.usecartlist.com").replace(/\/$/, "");
+    const publicUrl = `${baseUrl}/view/${stockpile._id}`;
 
     if (prefs.sms !== false) {
       // Template: stockpile_updated
@@ -363,7 +365,8 @@ const sendStockpileExtensionNotification = async (vendor: any, stockpile: any) =
   try {
     const prefs = vendor.notifications?.stockpileUpdates || { email: true, sms: true, push: true, inApp: true };
     const closingDate = format(new Date(stockpile.endDate), "d MMM yyyy");
-    const publicUrl = `${process.env.APP_URL || ""}/view/${stockpile._id}`;
+    const baseUrl = (process.env.APP_URL || "https://www.usecartlist.com").replace(/\/$/, "");
+    const publicUrl = `${baseUrl}/view/${stockpile._id}`;
 
     if (prefs.sms !== false) {
       // Template: stockpile_extended
@@ -402,7 +405,8 @@ const sendStockpileExtensionNotification = async (vendor: any, stockpile: any) =
 const sendStockpileClosedNotification = async (vendor: any, stockpile: any) => {
   try {
     const prefs = vendor.notifications?.stockpileUpdates || { email: true, sms: true, push: true, inApp: true };
-    const publicUrl = `${process.env.APP_URL || ""}/view/${stockpile._id}`;
+    const baseUrl = (process.env.APP_URL || "https://www.usecartlist.com").replace(/\/$/, "");
+    const publicUrl = `${baseUrl}/view/${stockpile._id}`;
 
     if (prefs.sms !== false) {
       // Template: stockpile_closed
@@ -455,6 +459,7 @@ app.use(cors({
   origin: true,
   credentials: true
 }));
+app.set("trust proxy", 1);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(cookieParser());
@@ -878,7 +883,7 @@ app.post("/api/stockpiles/:id/remind", authenticate, async (req: any, res) => {
 app.get("/api/auth/google/url", (req, res) => {
   const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
   const options = {
-    redirect_uri: `${process.env.APP_URL}/api/auth/google/callback`,
+    redirect_uri: `${process.env.APP_URL || "https://www.usecartlist.com"}/api/auth/google/callback`,
     client_id: process.env.GOOGLE_CLIENT_ID!,
     access_type: "offline",
     response_type: "code",
@@ -906,7 +911,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
       code,
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: `${process.env.APP_URL}/api/auth/google/callback`,
+      redirect_uri: `${process.env.APP_URL || "https://www.usecartlist.com"}/api/auth/google/callback`,
       grant_type: "authorization_code",
     });
 
