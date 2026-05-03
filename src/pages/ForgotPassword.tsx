@@ -74,15 +74,16 @@ export default function ForgotPassword() {
       });
       if (response.ok) {
         setEmail(data.email);
+        setIsSubmitting(false);
         setStep("otp");
         setResendTimer(60);
       } else {
         const result = await response.json();
         setError(result.message || "Something went wrong");
+        setIsSubmitting(false);
       }
     } catch (err) {
       setError("Connection error. Please try again.");
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -127,14 +128,16 @@ export default function ForgotPassword() {
       });
       if (response.ok) {
         setOtp(data.otp);
+        setIsSubmitting(false);
         setStep("reset");
+        return; // Exit early to avoid finally block if component is switching
       } else {
         const result = await response.json();
         setError(result.message || "Invalid OTP");
+        setIsSubmitting(false);
       }
     } catch (err) {
       setError("Connection error. Please try again.");
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -149,14 +152,15 @@ export default function ForgotPassword() {
         body: JSON.stringify({ email, otp, newPassword: data.password }),
       });
       if (response.ok) {
-        navigate("/login", { state: { message: "Password reset successfully. Please login with your new password." } });
+        setIsSubmitting(false);
+        navigate("/login", { state: { message: "Password reset successfully! Please login with your new password." } });
       } else {
         const result = await response.json();
         setError(result.message || "Failed to reset password");
+        setIsSubmitting(false);
       }
     } catch (err) {
       setError("Connection error. Please try again.");
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -180,22 +184,27 @@ export default function ForgotPassword() {
 
         <Card className="border-none shadow-2xl shadow-orange-100/50 rounded-[32px] overflow-hidden bg-white">
           <CardContent className="p-8">
-            <AnimatePresence mode="wait">
-              {error && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold"
-                >
-                  <AlertCircle className="w-5 h-5 shrink-0" />
-                  {error}
-                </motion.div>
-              )}
+            <div className="mb-6">
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    key="error-message"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold overflow-hidden"
+                  >
+                    <AlertCircle className="w-5 h-5 shrink-0" />
+                    {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
+            <AnimatePresence>
               {step === "email" && (
                 <motion.form
-                  key="email"
+                  key="email-step"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
@@ -231,7 +240,7 @@ export default function ForgotPassword() {
 
               {step === "otp" && (
                 <motion.form
-                  key="otp"
+                  key="otp-step"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
@@ -256,40 +265,40 @@ export default function ForgotPassword() {
                     )}
                   </div>
 
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full h-14 bg-cartlist-orange hover:bg-orange-600 text-white rounded-full font-bold text-lg shadow-lg shadow-orange-200 transition-all"
-                    >
-                      {isSubmitting ? "Verifying..." : "Verify OTP"}
-                    </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full h-14 bg-cartlist-orange hover:bg-orange-600 text-white rounded-full font-bold text-lg shadow-lg shadow-orange-200 transition-all"
+                  >
+                    {isSubmitting ? "Verifying..." : "Verify OTP"}
+                  </Button>
 
-                    <div className="flex flex-col gap-3">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        disabled={resendTimer > 0 || isSubmitting}
-                        onClick={handleResendOtp}
-                        className="w-full h-12 text-cartlist-orange font-bold hover:bg-orange-50 rounded-full disabled:text-gray-400"
-                      >
-                        {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : "Resend OTP"}
-                      </Button>
-                      
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => setStep("email")}
-                        className="w-full h-12 text-gray-500 font-bold hover:bg-orange-50 rounded-full"
-                      >
-                        Change Email
-                      </Button>
-                    </div>
-                  </motion.form>
+                  <div className="flex flex-col gap-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={resendTimer > 0 || isSubmitting}
+                      onClick={handleResendOtp}
+                      className="w-full h-12 text-cartlist-orange font-bold hover:bg-orange-50 rounded-full disabled:text-gray-400"
+                    >
+                      {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : "Resend OTP"}
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setStep("email")}
+                      className="w-full h-12 text-gray-500 font-bold hover:bg-orange-50 rounded-full"
+                    >
+                      Change Email
+                    </Button>
+                  </div>
+                </motion.form>
               )}
 
               {step === "reset" && (
                 <motion.form
-                  key="reset"
+                  key="reset-step"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
