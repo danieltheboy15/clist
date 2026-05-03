@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion } from "motion/react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Logo } from "./Landing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "../contexts/AuthContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { 
   Eye, 
@@ -27,10 +27,17 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, fetchWithAuth } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(location.state?.message || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    // Clear success message when user interacts
+    if (error) setSuccessMessage(null);
+  }, [error]);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -116,6 +123,12 @@ export default function Login() {
             {error && (
               <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-2xl">
                 {error}
+              </div>
+            )}
+            {successMessage && (
+              <div className="mb-6 p-4 bg-green-50 border border-green-100 text-green-700 text-sm rounded-2xl font-medium flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                {successMessage}
               </div>
             )}
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
