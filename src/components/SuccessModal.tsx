@@ -204,13 +204,22 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
 
                   <div className="flex gap-2">
                     <div className="flex-1 bg-white border border-green-200 rounded-xl px-3 py-2.5 text-xs text-green-700 truncate text-left font-medium">
-                      https://wa.me/2348149347629?text=Hi%20I%20want%20to%20view%20my%20stockpile
+                      {(() => {
+                        const botNumber = (import.meta as any).env.VITE_WHATSAPP_BOT_NUMBER || "2348149347629";
+                        const id = data.stockpileId || data._id;
+                        const message = encodeURIComponent(`Hi, I want to view my stockpile ID: ${id}`);
+                        return `https://wa.me/${botNumber}?text=${message}`;
+                      })()}
                     </div>
                     <Button 
                       variant="outline" 
                       size="icon" 
                       onClick={() => {
-                        navigator.clipboard.writeText("https://wa.me/2348149347629?text=Hi%20I%20want%20to%20view%20my%20stockpile");
+                        const botNumber = (import.meta as any).env.VITE_WHATSAPP_BOT_NUMBER || "2348149347629";
+                        const id = data.stockpileId || data._id;
+                        const message = encodeURIComponent(`Hi, I want to view my stockpile ID: ${id}`);
+                        const link = `https://wa.me/${botNumber}?text=${message}`;
+                        navigator.clipboard.writeText(link);
                         showToast("WhatsApp link copied!");
                       }}
                       className="shrink-0 rounded-xl border-green-200 text-green-600 hover:bg-green-100 bg-white"
