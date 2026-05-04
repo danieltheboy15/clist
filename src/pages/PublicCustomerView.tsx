@@ -348,12 +348,7 @@ export default function PublicCustomerView() {
           © {new Date().getFullYear()} Cartlist . All rights reserved.
         </p>
 
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-cartlist-orange/10 rounded-lg flex items-center justify-center">
-            <span className="text-cartlist-orange font-black text-sm">C</span>
-          </div>
-          <span className="text-lg font-black text-gray-900 tracking-tight">Cartlist</span>
-        </div>
+        
       </footer>
     </div>
   );
