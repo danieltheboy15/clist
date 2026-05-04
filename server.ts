@@ -515,40 +515,61 @@ app.post("/api/webhooks/whatsapp", async (req, res) => {
         console.log(`[Webhook] Updated ${updateResult.modifiedCount} customers with interaction status.`);
 
         // 2. Find their most recent active stockpile
-        // We look for any stockpile where customerPhone matches the suffix
-        const stockpile = await Stockpile.findOne({ 
-          customerPhone: { $regex: shortPhone + "$" }, 
-          status: "active",
-          isDeleted: { $ne: true }
-        }).sort({ createdAt: -1 }); 
+        // Extract ID from message if present (e.g. "ID: 6d5e...")
+        const idMatch = text.match(/id:\s*([a-f0-9]{24})/i);
+        const explicitlyProvidedId = idMatch ? idMatch[1] : null;
+
+        let stockpile;
+        if (explicitlyProvidedId && mongoose.Types.ObjectId.isValid(explicitlyProvidedId)) {
+          console.log(`[Webhook] Message contains explicit ID: ${explicitlyProvidedId}. Fetching.`);
+          // When an ID is provided, we can be more lenient with status (customer might be viewing an old one)
+          // but usually they care about active or recently completed ones.
+          stockpile = await Stockpile.findOne({ 
+            _id: explicitlyProvidedId,
+            isDeleted: { $ne: true }
+          });
+        }
+        
+        // Fallback to phone number if no ID found or specific find failed
+        if (!stockpile) {
+          console.log(`[Webhook] No valid explicit ID found or find failed. Searching by phone suffix: ${shortPhone}`);
+          stockpile = await Stockpile.findOne({ 
+            customerPhone: { $regex: shortPhone + "$" }, 
+            status: "active",
+            isDeleted: { $ne: true }
+          }).sort({ createdAt: -1 }); 
+        }
 
         if (stockpile) {
-          console.log(`[Webhook] Found matching stockpile: ${stockpile._id} for customer ${stockpile.customerName}`);
+          console.log(`[Webhook] Proceeding with stockpile: ${stockpile._id} (Status: ${stockpile.status})`);
           const vendor = await User.findById(stockpile.vendorId);
           
           if (vendor) {
-            console.log(`[Webhook] Triggering auto-response for vendor: ${vendor.businessName}`);
+            console.log(`[Webhook] Matching vendor found: ${vendor.businessName}`);
             
-            // Check if we should send the "Welcome/Summary" notification
-            // We send it if it was never successfully sent before, OR if they specifically used the "view my stockpile" link
             const neverSent = !stockpile.lastWhatsAppTemplateSent;
-            const specificallyRequested = text.includes("view") || text.includes("stockpile");
+            const includesKeywords = text.includes("view") || text.includes("stockpile");
+            const hasExplicitId = !!explicitlyProvidedId;
             
-            if (neverSent || specificallyRequested) {
-               console.log(`[Webhook] Sending stockpile_created template to ${from} (neverSent=${neverSent}, specificallyRequested=${specificallyRequested})`);
-               const success = await sendStockpileCreatedNotification(vendor, stockpile);
-               console.log(`[Webhook] resend attempt result: ${success ? "SUCCESS" : "FAILED"}`);
+            if (neverSent || includesKeywords || hasExplicitId) {
+               console.log(`[Webhook] Sending notification. Reason: neverSent=${neverSent}, keywords=${includesKeywords}, hasId=${hasExplicitId}`);
+               
+               let success = false;
+               if (stockpile.status === "active") {
+                 success = await sendStockpileCreatedNotification(vendor, stockpile).catch(() => false);
+               } else if (stockpile.status === "closed") {
+                 success = await sendStockpileClosedNotification(vendor, stockpile).catch(() => false);
+               }
+               
+               console.log(`[Webhook] Notification result: ${success ? "SUCCESS" : "FAILED"}`);
             } else {
-               console.log(`[Webhook] Stockpile already has lastWhatsAppTemplateSent="${stockpile.lastWhatsAppTemplateSent}". skipping auto-send.`);
+               console.log(`[Webhook] Conditions not met for auto-send. lastWhatsAppTemplateSent="${stockpile.lastWhatsAppTemplateSent}"`);
             }
           } else {
             console.error(`[Webhook] ERROR: Vendor ${stockpile.vendorId} not found for stockpile ${stockpile._id}`);
           }
         } else {
-          console.log(`[Webhook] No active stockpile found for phone suffix ending in ${shortPhone}`);
-          
-          // Fallback: If no active stockpile, check for most recent closed one to maybe send something?
-          // For now, let's just log it.
+          console.log(`[Webhook] No suitable stockpile found for phone suffix ending in ${shortPhone}`);
         }
       } catch (err) {
         console.error("[Webhook] CRITICAL ERROR processing incoming message:", err);
@@ -882,8 +903,13 @@ app.post("/api/stockpiles/:id/remind", authenticate, async (req: any, res) => {
 // Auth Routes
 app.get("/api/auth/google/url", (req, res) => {
   const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
+  const baseUrl = (process.env.APP_URL || "https://www.usecartlist.com").replace(/\/$/, "");
+  const redirectUri = `${baseUrl}/api/auth/google/callback`;
+  
+  console.log("Generating Google Auth URL with redirect_uri:", redirectUri);
+
   const options = {
-    redirect_uri: `${process.env.APP_URL || "https://www.usecartlist.com"}/api/auth/google/callback`,
+    redirect_uri: redirectUri,
     client_id: process.env.GOOGLE_CLIENT_ID!,
     access_type: "offline",
     response_type: "code",
@@ -906,12 +932,17 @@ app.get("/api/auth/google/callback", async (req, res) => {
   }
 
   try {
+    const baseUrl = (process.env.APP_URL || "https://www.usecartlist.com").replace(/\/$/, "");
+    const redirectUri = `${baseUrl}/api/auth/google/callback`;
+    
+    console.log("Exchanging Google code with redirect_uri:", redirectUri);
+
     // Exchange code for tokens
     const tokenResponse = await axios.post("https://oauth2.googleapis.com/token", {
       code,
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: `${process.env.APP_URL || "https://www.usecartlist.com"}/api/auth/google/callback`,
+      redirect_uri: redirectUri,
       grant_type: "authorization_code",
     });
 
